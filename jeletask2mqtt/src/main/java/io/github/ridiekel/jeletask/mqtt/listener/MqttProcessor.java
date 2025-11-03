@@ -10,6 +10,7 @@ import io.github.ridiekel.jeletask.mqtt.Teletask2MqttConfiguration;
 import io.github.ridiekel.jeletask.mqtt.TeletaskService;
 import io.github.ridiekel.jeletask.mqtt.listener.homeassistant.HAConfig;
 import io.github.ridiekel.jeletask.mqtt.listener.homeassistant.HAConfigParameters;
+import io.github.ridiekel.jeletask.mqtt.listener.homeassistant.HADeviceConfig;
 import io.github.ridiekel.jeletask.mqtt.listener.homeassistant.types.*;
 import org.apache.commons.lang3.StringUtils;
 import org.awaitility.Awaitility;
@@ -42,6 +43,7 @@ public class MqttProcessor implements StateChangeListener {
             "EVENT", whatPattern(AnsiColor.YELLOW),
             "COMMAND", whatPattern(AnsiColor.MAGENTA),
             "CREATE", whatPattern(AnsiColor.CYAN),
+            "CREATE_DEVICE", whatPattern(AnsiColor.CYAN),
             "DELETE", whatPattern(AnsiColor.BLUE)
     );
 
@@ -186,19 +188,54 @@ public class MqttProcessor implements StateChangeListener {
     }
 
     private void publishConfig() {
-        LOG.info("Publishing config...");
-        this.teletaskClient.getConfig().getAllComponents().forEach(c -> {
-            this.toConfig(c).forEach((t,m) -> {
-                this.publish("CREATE", c, t, m, this.service.getConfiguration().getLog().isHaconfigEnabled() ? LOG::info : LOG::debug);
-            });
+        LOG.info("Publishing device config...");
+        
+        // Get all components
+        List<? extends ComponentSpec> allComponents = this.teletaskClient.getConfig().getAllComponents();
+        LOG.info("Found {} components to configure", allComponents.size());
+        
+        // Create HAConfig for each component
+        Map<ComponentSpec, HAConfig<?>> componentConfigs = new HashMap<>();
+        allComponents.forEach(c -> {
+            LOG.debug("Processing component: {} {}", c.getFunction(), c.getNumber());
+            Optional.ofNullable(FUNCTION_TO_TYPE.get(c.getFunction()))
+                    .ifPresent(functionConfig -> {
+                        HAConfigParameters params = new HAConfigParameters(
+                                this.teletaskClient.getConfig(),
+                                c,
+                                this.baseTopic(c),
+                                this.teletaskIdentifier
+                        );
+                        
+                        // Create the HAConfig but don't publish individual topics
+                        functionConfig.config.forEach(configFunc -> {
+                            HAConfig<?> haConfig = configFunc.apply(params);
+                            componentConfigs.put(c, haConfig);
+                            LOG.debug("Created config for {} {}", c.getFunction(), c.getNumber());
+                        });
+                    });
         });
-    }
-
-    private Map<String, String> toConfig(ComponentSpec component) {
-        return Optional.ofNullable(component)
-                .flatMap(c -> Optional.ofNullable(FUNCTION_TO_TYPE.get(c.getFunction()))
-                        .map(f -> f.getConfigTopicsAndMessages(this.teletaskClient.getConfig(), c, this.baseTopic(c), this.teletaskIdentifier, this.haDiscoveryPrefix()))
-                ).orElse(new HashMap<>());
+        
+        LOG.info("Created configs for {} components", componentConfigs.size());
+        
+        // Create single device config with all components
+        HADeviceConfig deviceConfig = new HADeviceConfig(
+                this.teletaskClient.getConfig(),
+                this.teletaskIdentifier,
+                new ArrayList<>(allComponents),
+                this.prefix + "/" + this.teletaskIdentifier,
+                componentConfigs
+        );
+        
+        // Publish single device discovery topic
+        String deviceTopic = this.haDiscoveryPrefix() + "/device/" + this.teletaskIdentifier + "/config";
+        String deviceMessage = deviceConfig.toString();
+        
+        LOG.info("Publishing device config to topic: {}", deviceTopic);
+        LOG.debug("Device config message: {}", deviceMessage);
+        
+        this.publish("CREATE_DEVICE", null, deviceTopic, deviceMessage, 
+                this.service.getConfiguration().getLog().isHaconfigEnabled() ? LOG::info : LOG::debug);
     }
 
     private String haDiscoveryPrefix() {
@@ -322,6 +359,9 @@ public class MqttProcessor implements StateChangeListener {
     }
 
     private String getLoggingStringForComponent(ComponentSpec componentSpec) {
+        if (componentSpec == null) {
+            return "[DEVICE   ] - [   ] - [                            Device Discovery]";
+        }
         return String.format("[%s] - [%s] - [%s]", StringUtils.rightPad(componentSpec.getFunction().toString(), 10), StringUtils.leftPad(String.valueOf(componentSpec.getNumber()), 3), StringUtils.leftPad(componentSpec.getDescription(), 40));
     }
 

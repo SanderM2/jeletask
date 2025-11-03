@@ -26,11 +26,6 @@
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>org.springframework.experimental</groupId>
-            <artifactId>spring-native</artifactId>
-            <version>${spring-native.version}</version>
-        </dependency>
-        <dependency>
             <groupId>io.github.ridiekel</groupId>
             <artifactId>jeletask2mqtt</artifactId>
         </dependency>
@@ -54,14 +49,21 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.springframework.experimental</groupId>
-                <artifactId>spring-aot-maven-plugin</artifactId>
-                <version>${spring-native.version}</version>
+                <groupId>org.graalvm.buildtools</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <version>0.9.28</version>
+                <configuration>
+                    <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                    <metadataRepository>
+                        <enabled>true</enabled>
+                    </metadataRepository>
+                    <requiredVersion>22.3</requiredVersion>
+                </configuration>
                 <executions>
                     <execution>
-                        <id>generate</id>
+                        <id>add-reachability-metadata</id>
                         <goals>
-                            <goal>generate</goal>
+                            <goal>add-reachability-metadata</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -85,18 +87,4 @@
         </plugins>
     </build>
 
-    <repositories>
-        <repository>
-            <id>spring-release</id>
-            <name>Spring release</name>
-            <url>https://repo.spring.io/release</url>
-        </repository>
-    </repositories>
-    <pluginRepositories>
-        <pluginRepository>
-            <id>spring-release</id>
-            <name>Spring release</name>
-            <url>https://repo.spring.io/release</url>
-        </pluginRepository>
-    </pluginRepositories>
 </project>

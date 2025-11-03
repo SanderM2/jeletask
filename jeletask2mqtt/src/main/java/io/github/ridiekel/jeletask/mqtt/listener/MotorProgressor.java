@@ -33,13 +33,19 @@ public class MotorProgressor extends TimerTask {
         ComponentState state = motor.getState();
         if (Objects.equals(state.getState(), "ON")) {
             try {
-                Progress progress = new Progress(this.processor.getConfiguration().getPublish().getMotorPositionInterval(), state);
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Motor {} started running:\n{}", motor.getNumber(), progress.prettyString());
-                } else if (LOG.isDebugEnabled()) {
-                    LOG.debug("Motor {} started running: {}", motor.getNumber(), progress.getState().getCurrentPosition());
+                // Only attempt progress tracking if we have sufficient timing information
+                Number secondsToFinish = state.getSecondsToFinish();
+                if (secondsToFinish != null && secondsToFinish.floatValue() > 0) {
+                    Progress progress = new Progress(this.processor.getConfiguration().getPublish().getMotorPositionInterval(), state);
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Motor {} started running:\n{}", motor.getNumber(), progress.prettyString());
+                    } else if (LOG.isDebugEnabled()) {
+                        LOG.debug("Motor {} started running: {}", motor.getNumber(), progress.getState().getCurrentPosition());
+                    }
+                    this.runningMotors.put(motor, progress);
+                } else {
+                    LOG.debug("Motor {} started running, but no timing information available for progress tracking", motor.getNumber());
                 }
-                this.runningMotors.put(motor, progress);
             } catch (Exception e) {
                 LOG.debug("Motor {} started running, but exception occured in calculating progress", motor.getNumber(), e);
             }

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "java.util.LinkedHashMap"
+  },
+  {
+    "name": "org.eclipse.paho.client.mqttv3.logging.JSR47Logger"
+  },
+  {
+    "name": "org.eclipse.paho.client.mqttv3.internal.security.SSLSocketFactoryFactory"
+  },
+  {
+    "name": "org.eclipse.paho.client.mqttv3.internal.TCPNetworkModule"
+  },
+  {
+    "name": "org.eclipse.paho.client.mqttv3.internal.SSLNetworkModule"
+  }
+]

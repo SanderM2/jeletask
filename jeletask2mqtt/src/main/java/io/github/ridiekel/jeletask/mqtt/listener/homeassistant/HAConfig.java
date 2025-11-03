@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.ridiekel.jeletask.client.spec.ComponentSpec;
 
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -22,15 +23,16 @@ public class HAConfig<T extends HAConfig<T>> {
         this.deviceIdentifiers = this.device.putArray("identifiers");
 
         var uniqueId = id(parameters);
+        String domain = getDomainForComponent(parameters.getComponentSpec());
 
         this.baseTopic(parameters.getBaseTopic())
                 .stateTopic("~/state")
                 .uniqueId(uniqueId)
-                .objectId(uniqueId)
+                .defaultEntityId(domain, uniqueId)  // Use new method instead of objectId
                 .name(parameters.getComponentSpec().getDescription())
-                .manufacturer("teletask")
+                .manufacturer("Teletask")
                 .deviceIdentifier(parameters.getIdentifier())
-                .deviceName(String.format("teletask-%s", parameters.getIdentifier()))
+                .deviceName(parameters.getIdentifier())
                 .model(parameters.getCentralUnit().getCentralUnitType().getDisplayName());
     }
 
@@ -59,7 +61,50 @@ public class HAConfig<T extends HAConfig<T>> {
     }
 
     public T objectId(String value) {
+        // Use default_entity_id instead of deprecated object_id
+        // Note: This requires the domain prefix, but we don't have access to it here
+        // For now, keep using object_id until we can refactor to pass domain info
         return this.put("object_id", value);
+    }
+
+    public T defaultEntityId(String domain, String value) {
+        // New method for using default_entity_id with proper domain prefix
+        return this.put("default_entity_id", domain + "." + value);
+    }
+
+    private String getDomainForComponent(ComponentSpec spec) {
+        // Use the configured HA type from the JSON config file if available
+        String configuredType = spec.getHAType();
+        if (configuredType != null && !configuredType.isEmpty()) {
+            return configuredType;
+        }
+        
+        // Fallback to function-based mapping
+        // This matches the logic in HADeviceConfig.getComponentDomain()
+        switch (spec.getFunction()) {
+            case RELAY:
+                return "switch";  // Default for relays
+            case LOCMOOD:
+            case GENMOOD:
+            case TIMEDMOOD:
+            case FLAG:
+                return "switch";
+            case DIMMER:
+                return "light";
+            case MOTOR:
+                return "cover";
+            case COND:
+            case INPUT:
+                return "binary_sensor";
+            case SENSOR:
+                // Check if this is a TEMPERATURECONTROL sensor -> should be climate
+                if ("TEMPERATURECONTROL".equalsIgnoreCase(spec.getType())) {
+                    return "climate";
+                }
+                return "sensor";
+            default:
+                return "switch"; // fallback
+        }
     }
 
     public T name(String value) {
