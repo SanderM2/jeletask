@@ -23,6 +23,11 @@ public class LongPressInputCaptor {
     public void update(ComponentSpec component) {
         if (Objects.equals(component.getState().getState(), "OPEN")) {
             open(component);
+            // Publish the current state when opening (pressed state)
+            Captor captor = getCaptor(component);
+            captor.setTemporaryState("PRESSED");
+            this.processor.publishState(component, captor);
+            captor.setTemporaryState(null); // Reset to use calculated state
         } else {
             close(component);
         }
@@ -71,9 +76,14 @@ public class LongPressInputCaptor {
         private Long openTime;
         private Long closeTime;
         private final long longPressConfigInMillis;
+        private String temporaryState;
 
         public Captor(long longPressConfigInMillis) {
             this.longPressConfigInMillis = longPressConfigInMillis;
+        }
+
+        public void setTemporaryState(String temporaryState) {
+            this.temporaryState = temporaryState;
         }
 
         public void open() {
@@ -98,11 +108,20 @@ public class LongPressInputCaptor {
 
         @Override
         public String getState() {
+            if (temporaryState != null) {
+                return temporaryState;
+            }
             return this.getOpenTime() == null ? "NOT_PRESSED" : this.getPressDurationMillis() >= this.getLongPressConfigInMillis() ? "LONG_PRESS" : "SHORT_PRESS";
         }
 
         public Long getPressDurationMillis() {
-            return this.getOpenTime() == null ? -1 : this.getCloseTime() - this.getOpenTime();
+            if (this.getOpenTime() == null) {
+                return -1L;
+            }
+            if (this.getCloseTime() == null) {
+                return -1L; // Still pressed, no duration available yet
+            }
+            return this.getCloseTime() - this.getOpenTime();
         }
 
         @Override

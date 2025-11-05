@@ -8,6 +8,9 @@ public class HAInputTriggerConfig extends HAReadOnlyConfig<HAInputTriggerConfig>
     public HAInputTriggerConfig(HAConfigParameters parameters) {
         super(parameters);
 
-        this.put("value_template", "{{ value_json.state }}");
+        // For INPUT components, we need to map the various input states to binary sensor ON/OFF
+        // PRESSED, SHORT_PRESS, LONG_PRESS -> ON
+        // NOT_PRESSED, OPEN, CLOSED -> OFF
+        this.put("value_template", "{% if value_json.state in ['PRESSED', 'SHORT_PRESS', 'LONG_PRESS'] %}ON{% else %}OFF{% endif %}");
     }
 }

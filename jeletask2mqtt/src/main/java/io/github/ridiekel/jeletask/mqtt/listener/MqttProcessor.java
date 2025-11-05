@@ -245,7 +245,7 @@ public class MqttProcessor implements StateChangeListener {
     private static final Map<Function, FunctionConfig> FUNCTION_TO_TYPE = Map.ofEntries(
             // COND and INPUT are readonly -> HA autodiscovery: binary_sensor
             Map.entry(Function.COND, f("binary_sensor", HABinarySensorConfig::new)),
-            Map.entry(Function.INPUT, f("sensor", HAInputTriggerConfig::new)),
+            Map.entry(Function.INPUT, f("binary_sensor", HAInputTriggerConfig::new)),
             // Dimmers -> -> HA auto discovery: light
             Map.entry(Function.DIMMER, f("light", HADimmerConfig::new)),
             // Flags can be read + turned on/off -> HA auto discovery: switch
@@ -327,7 +327,11 @@ public class MqttProcessor implements StateChangeListener {
     @Override
     public void receive(List<ComponentSpec> components) {
         components.forEach(c -> {
-            publishState(c, c.getState());
+            // For INPUT components, skip the initial publish and let LongPressInputCaptor handle it
+            // This avoids duplicate messages (first CLOSED, then NOT_PRESSED)
+            if (c.getFunction() != Function.INPUT) {
+                publishState(c, c.getState());
+            }
 
             if (c.getFunction() == Function.MOTOR) {
                 this.motorProgressor.update(c);
