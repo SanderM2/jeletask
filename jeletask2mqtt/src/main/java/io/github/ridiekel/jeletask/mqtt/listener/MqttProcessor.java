@@ -259,7 +259,14 @@ public class MqttProcessor implements StateChangeListener {
             // Motors -> HA auto discovery: cover. Sufficient?
             Map.entry(Function.MOTOR, f("cover", HAMotorConfig::new)),
             Map.entry(Function.SENSOR, f("sensor", HASensorConfig::new)),
-            Map.entry(Function.RELAY, f("light", HARelayConfig::new)),
+            Map.entry(Function.RELAY, f("light", params -> {
+                // Check if the component has a custom HAtype configured
+                if ("binary_sensor".equals(params.getComponentSpec().getHAType())) {
+                    return new HARelaySensorConfig(params);
+                } else {
+                    return new HARelayConfig(params);
+                }
+            })),
             // Timed functions actually act like a switch. They can only be ON or OFF -> HA auto discovery: switch
             Map.entry(Function.TIMEDFNC, f("switch", HARelayConfig::new))
     );
@@ -320,6 +327,10 @@ public class MqttProcessor implements StateChangeListener {
         }
 
         protected String haComponent(ComponentSpec c, HAConfig<?> config) {
+            // For relays configured as binary_sensor, return binary_sensor
+            if (c.getFunction() == Function.RELAY && "binary_sensor".equals(c.getHAType())) {
+                return "binary_sensor";
+            }
             return Optional.ofNullable(FUNCTION_TO_TYPE.get(c.getFunction())).map(f -> f.getHAType(c, config)).orElse("light");
         }
     }
