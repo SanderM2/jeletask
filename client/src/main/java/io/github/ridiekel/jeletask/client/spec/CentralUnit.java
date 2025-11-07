@@ -34,6 +34,7 @@ public class CentralUnit {
     private Map<Function, List<ComponentSpec>> componentsTypes = new LinkedHashMap<>();
     private List<ComponentSpec> allComponents;
     private CentralUnitType type;
+    private boolean new_naming = false;
 
     /**
      * Default constructor.
@@ -83,6 +84,14 @@ public class CentralUnit {
 
     public void setType(CentralUnitType type) {
         this.type = type;
+    }
+
+    public boolean isNew_naming() {
+        return new_naming;
+    }
+
+    public void setNew_naming(boolean new_naming) {
+        this.new_naming = new_naming;
     }
 
     // ================================ HELPER METHODS

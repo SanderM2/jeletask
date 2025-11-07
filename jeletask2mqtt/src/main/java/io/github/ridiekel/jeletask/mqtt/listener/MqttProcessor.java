@@ -194,6 +194,13 @@ public class MqttProcessor implements StateChangeListener {
         List<? extends ComponentSpec> allComponents = this.teletaskClient.getConfig().getAllComponents();
         LOG.info("Found {} components to configure", allComponents.size());
         
+        // Log new naming configuration
+        if (this.teletaskClient.getConfig().isNew_naming()) {
+            LOG.info("New naming is enabled - using cleaned component descriptions for entity names");
+        } else {
+            LOG.info("New naming is disabled - using default naming scheme");
+        }
+        
         // Create HAConfig for each component
         Map<ComponentSpec, HAConfig<?>> componentConfigs = new HashMap<>();
         allComponents.forEach(c -> {
@@ -211,6 +218,8 @@ public class MqttProcessor implements StateChangeListener {
                         functionConfig.config.forEach(configFunc -> {
                             HAConfig<?> haConfig = configFunc.apply(params);
                             componentConfigs.put(c, haConfig);
+                            
+                            // Debug logging: Compare old vs new naming
                             LOG.debug("Created config for {} {}", c.getFunction(), c.getNumber());
                         });
                     });
@@ -304,7 +313,7 @@ public class MqttProcessor implements StateChangeListener {
             Map<String, String> topics = new HashMap<>();
             for (java.util.function.Function<HAConfigParameters, HAConfig<?>> c : this.config) {
                 HAConfig<?> haConfig = c.apply(params);
-                String topic = createConfigTopic(componentSpec, haConfig, haNodeId, haDiscoveryPrefix);
+                String topic = createConfigTopic(componentSpec, haConfig, haNodeId, haDiscoveryPrefix, centralUnit);
                 String message = Optional.ofNullable(haConfig).map(HAConfig::toString).orElse(null);
                 topics.put(topic, message);
             }
@@ -312,17 +321,28 @@ public class MqttProcessor implements StateChangeListener {
             return topics;
         }
 
-        private String createConfigTopic(ComponentSpec c, HAConfig<?> config, String haNodeId, String haDiscoveryPrefix) {
+        private String createConfigTopic(ComponentSpec c, HAConfig<?> config, String haNodeId, String haDiscoveryPrefix, CentralUnit centralUnit) {
             //<discovery_prefix>/<component>/[<node_id>/]<object_id>/config
             return String.format("%s/%s/%s/%s/config",
                     haDiscoveryPrefix,
                     haComponent(c, config),
                     haNodeId,
-                    haObjectId(c, config)
+                    haObjectId(c, config, centralUnit)
             );
         }
 
-        protected String haObjectId(ComponentSpec c, HAConfig<?> config) {
+        protected String haObjectId(ComponentSpec c, HAConfig<?> config, CentralUnit centralUnit) {
+            // If new naming is enabled, use cleaned description
+            if (centralUnit.isNew_naming()) {
+                String cleanedDescription = c.getDescription().toLowerCase()
+                    .replaceAll("[^a-zA-Z0-9\\s]", "")  // Remove non-alphanumeric except spaces
+                    .replaceAll("\\s+", "_")            // Replace spaces with underscore
+                    .replaceAll("_+", "_")              // Replace multiple underscores with single
+                    .replaceAll("^_|_$", "");           // Remove leading/trailing underscores
+                return "teletask_" + cleanedDescription;
+            }
+            
+            // Otherwise, use the default naming scheme
             return c.getFunction().toString().toLowerCase() + "_" + c.getNumber();
         }
 

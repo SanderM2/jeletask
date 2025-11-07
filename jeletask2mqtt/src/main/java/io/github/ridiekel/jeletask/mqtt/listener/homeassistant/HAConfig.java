@@ -176,12 +176,29 @@ public class HAConfig<T extends HAConfig<T>> {
     }
 
     protected String id(HAConfigParameters parameters) {
+        // If new naming is enabled, use cleaned description
+        if (parameters.getCentralUnit().isNew_naming()) {
+            String cleanedDescription = cleanDescription(parameters.getComponentSpec().getDescription());
+            return "teletask_" + cleanedDescription;
+        }
+        
+        // Otherwise, use the default naming scheme
         String id = "teletask-" + parameters.getIdentifier() + "-" + parameters.getComponentSpec().getFunction().toString().toLowerCase() + "-" + parameters.getComponentSpec().getNumber();
         return removeInvalid(id, "_");
     }
 
     private static String removeInvalid(String value, String replacement) {
         return INVALID_CHARS.matcher(value).replaceAll(replacement);
+    }
+
+    private static String cleanDescription(String description) {
+        // Clean the description: remove non-alphanumeric chars, replace spaces with underscore
+        // "Kelder: test/Voeding - PWM Dimmer" -> "kelder_test_voeding_pwm_dimmer"
+        return description.toLowerCase()
+                .replaceAll("[^a-zA-Z0-9\\s]", "")  // Remove non-alphanumeric except spaces
+                .replaceAll("\\s+", "_")            // Replace one or more spaces with underscore
+                .replaceAll("_+", "_")              // Replace multiple underscores with single
+                .replaceAll("^_|_$", "");           // Remove leading/trailing underscores
     }
 
     @SuppressWarnings("unchecked")
